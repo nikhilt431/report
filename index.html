@@ -124,6 +124,9 @@
     .alias-chip { display: inline-flex; align-items: center; gap: 4px; background: #334155; color: #e2e8f0; font-size: 11px; padding: 3px 8px; border-radius: 6px; margin: 2px 4px 2px 0; font-family: 'JetBrains Mono', monospace; }
     .alias-chip-del { cursor: pointer; color: #f87171; font-weight: bold; padding-left: 2px; }
     .alias-chip-del:hover { color: #ef4444; }
+    
+    @keyframes highlightPulse { 0% { background-color: rgba(56, 189, 248, 0.5); } 100% { background-color: transparent; } }
+    .highlight-row { animation: highlightPulse 2s ease-out; }
   </style>
 </head>
 <body>
@@ -509,7 +512,7 @@
               else colorClass = "text-green";
           }
           
-          html += `<tr style="${m.absent ? 'opacity:0.6;' : ''}">
+          html += `<tr id="member-row-${gIdx}-${mIdx}" style="${m.absent ? 'opacity:0.6;' : ''}">
             <td class="member-idx">${mIdx + 1}</td>
             <td class="member-name">
               <div style="display:flex; align-items:center; gap:6px;">
@@ -1312,6 +1315,13 @@
           applyTokensToMember(matchedMember.member, tokens);
           saveData();
           renderApp();
+          
+          const row = document.getElementById(`member-row-${matchedMember.gIdx}-${matchedMember.mIdx}`);
+          if (row) {
+            row.classList.add('highlight-row');
+            setTimeout(() => row.classList.remove('highlight-row'), 2000);
+          }
+          
           const c1Str = formatCellVal(matchedMember.member.c1);
           const c2Str = formatCellVal(matchedMember.member.c2);
           const c3Str = formatCellVal(matchedMember.member.c3);
