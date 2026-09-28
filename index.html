@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
   <style>
     :root {
       --primary: #2563eb;
@@ -281,6 +284,38 @@
     let selectedGroupForMembers = null;
     let viewingHistoryIdx = null;
     let viewingSlotIdx = null; // New slot viewing logic
+    let isRemoteUpdate = false;
+
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBK-H2VdEScOaxa-oLbScZo6hv081qGGTE",
+      authDomain: "report-1a015.firebaseapp.com",
+      databaseURL: "https://report-1a015-default-rtdb.firebaseio.com",
+      projectId: "report-1a015",
+      storageBucket: "report-1a015.firebasestorage.app",
+      messagingSenderId: "72997263181",
+      appId: "1:72997263181:web:4ca01bbe81b2e94d9c4904"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    // Listen for realtime updates from Firebase
+    firebase.database().ref('appData').on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        isRemoteUpdate = true;
+        appData = data;
+        
+        // Ensure missing arrays/objects exist after loading from cloud
+        if (!appData.saveSlots) appData.saveSlots = [null, null, null, null, null, null];
+        if (!appData.voiceAliases) appData.voiceAliases = {};
+        if (!appData.voiceLang) appData.voiceLang = 'en-IN';
+        if (!appData.reportHistory) appData.reportHistory = [];
+        
+        localStorage.setItem("report_app_data_v2", JSON.stringify(appData));
+        if (typeof renderApp === 'function') renderApp();
+        isRemoteUpdate = false;
+      }
+    });
 
     function loadData() {
       const saved = localStorage.getItem("report_app_data_v2");
@@ -303,6 +338,11 @@
         appData.reportTitle = val;
       }
       localStorage.setItem("report_app_data_v2", JSON.stringify(appData));
+      
+      if (!isRemoteUpdate) {
+        firebase.database().ref('appData').set(appData).catch(e => console.error("Firebase sync error:", e));
+      }
+      
       updateSummary();
     }
 
