@@ -301,24 +301,47 @@
     };
     firebase.initializeApp(firebaseConfig);
 
+    function normalizeData(data) {
+      if (!data) return data;
+      if (!data.voiceAliases) data.voiceAliases = {};
+      if (!data.voiceLang) data.voiceLang = 'en-IN';
+      
+      // Fix report history sparse array/object
+      if (!data.reportHistory) data.reportHistory = [];
+      else if (!Array.isArray(data.reportHistory)) data.reportHistory = Object.values(data.reportHistory);
+      
+      // Fix groups sparse array/object
+      if (!data.groups) data.groups = [];
+      else if (!Array.isArray(data.groups)) data.groups = Object.values(data.groups);
+      
+      data.groups.forEach(g => { 
+        if (!g.members) g.members = []; 
+        else if (!Array.isArray(g.members)) g.members = Object.values(g.members);
+      });
+      
+      // Fix save slots (strictly 6 items)
+      let newSlots = [null, null, null, null, null, null];
+      if (data.saveSlots) {
+        if (Array.isArray(data.saveSlots)) {
+          for (let i = 0; i < 6; i++) newSlots[i] = data.saveSlots[i] || null;
+        } else if (typeof data.saveSlots === 'object') {
+          for (let k in data.saveSlots) {
+            let idx = parseInt(k, 10);
+            if (!isNaN(idx) && idx >= 0 && idx < 6) newSlots[idx] = data.saveSlots[k];
+          }
+        }
+      }
+      data.saveSlots = newSlots;
+      
+      return data;
+    }
+
     // Listen for realtime updates from Firebase
     firebase.database().ref('appData').on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
         isRemoteUpdate = true;
-        appData = data;
-        
-        // Ensure missing arrays/objects exist after loading from cloud
-        if (!appData.saveSlots) appData.saveSlots = [null, null, null, null, null, null];
-        if (!appData.voiceAliases) appData.voiceAliases = {};
-        if (!appData.voiceLang) appData.voiceLang = 'en-IN';
-        if (!appData.reportHistory) appData.reportHistory = [];
-        if (appData.groups) {
-          appData.groups.forEach(g => { if (!g.members) g.members = []; });
-        } else {
-          appData.groups = [];
-        }
-        
+        appData = normalizeData(data);
         localStorage.setItem("report_app_data_v2", JSON.stringify(appData));
         if (typeof renderApp === 'function') renderApp();
         isRemoteUpdate = false;
@@ -328,16 +351,7 @@
     function loadData() {
       const saved = localStorage.getItem("report_app_data_v2");
       let data = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultData));
-      if (!data.saveSlots) data.saveSlots = [null, null, null, null, null, null];
-      if (!data.voiceAliases) data.voiceAliases = {};
-      if (!data.voiceLang) data.voiceLang = 'en-IN';
-      if (!data.reportHistory) data.reportHistory = [];
-      if (data.groups) {
-        data.groups.forEach(g => { if (!g.members) g.members = []; });
-      } else {
-        data.groups = [];
-      }
-      return data;
+      return normalizeData(data);
     }
 
     function saveData() {
