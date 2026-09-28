@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mobile Report Entry & Summary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-subtle: #243248;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --james-color: #06b6d4;
+      --james-bg: rgba(6, 182, 212, 0.12);
+      --og-color: #84cc16;
+      --og-bg: rgba(132, 204, 22, 0.12);
+      --arain-color: #a855f7;
+      --arain-bg: rgba(168, 85, 247, 0.12);
+      --total-badge: #f59e0b;
+      --pink-x: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 90px; }
+    header { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .report-badge-container { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; }
+    .report-title-input { background: #15803d; color: #fff; font-weight: 800; font-size: 16px; border: 1px solid #22c55e; border-radius: 8px; padding: 6px 12px; width: 140px; text-align: center; outline: none; box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25); }
+    .top-actions { display: flex; gap: 6px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; transition: all 0.15s ease; color: #fff; }
+    .btn-primary { background: var(--primary); }
+    .btn-success { background: #16a34a; }
+    .btn-danger { background: var(--danger); }
+    .btn-secondary { background: var(--card-subtle); border: 1px solid var(--border); }
+    .btn:active { transform: scale(0.96); }
+    .tab-bar { display: flex; background: #111827; padding: 4px; border-radius: 10px; margin: 12px 14px 4px 14px; border: 1px solid var(--border); }
+    .tab-btn { flex: 1; text-align: center; padding: 8px 5px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; border: none; background: transparent; transition: all 0.2s; }
+    .tab-btn.active { background: var(--card-subtle); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .content-container { padding: 12px 14px; max-width: 600px; margin: 0 auto; }
+    .group-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; scrollbar-width: none; }
+    .group-chips::-webkit-scrollbar { display: none; }
+    .chip { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-muted); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .chip.active-all { background: #3b82f6; color: #fff; border-color: #60a5fa; }
+    .chip.active-group { background: var(--card-subtle); color: #fff; border-color: var(--primary); }
+    .group-section { margin-bottom: 20px; }
+    .group-header-card { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 12px 12px 0 0; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; background: var(--card-subtle); color: #fff; border: 1px solid var(--border); border-bottom: none; }
+    .group-pill-stat { background: rgba(0, 0, 0, 0.35); padding: 3px 8px; border-radius: 6px; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+    .member-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 0 0 12px 12px; overflow: hidden; border: 1px solid var(--border); border-top: none; }
+    .member-table th { background: #111827; padding: 8px 6px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); text-align: center; }
+    .member-table td { padding: 6px 4px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); text-align: center; font-size: 13px; }
+    .member-table tr:last-child td { border-bottom: none; }
+    .member-idx { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-weight: bold; width: 24px; }
+    .member-name { text-align: left !important; font-weight: 700; color: #fff; padding-left: 10px !important; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cell-inline-input { width: 42px; height: 42px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 16px; text-align: center; border: 1px solid #334155; background: #0f172a; color: #fff; outline: none; padding: 0; transition: all 0.2s ease; }
+    .cell-inline-input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4); background: #0284c7 !important; color: #fff !important; }
+    .cell-inline-input.val-num { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399; }
+    .summary-card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); padding: 16px; margin-bottom: 16px; }
+    .summary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .summary-header h3 { font-size: 16px; font-weight: 800; color: #fff; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .kpi-card { background: #111827; border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px; text-align: center; }
+    .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+    .kpi-value { font-size: 20px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .sum-table { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+    .sum-table th { background: #111827; color: var(--text-muted); padding: 10px 6px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border); }
+    .sum-table td { padding: 10px 6px; font-size: 13px; text-align: center; border-bottom: 1px solid rgba(51,65,85,0.4); font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+    .whatsapp-preview { background: #064e3b; border: 1px solid #059669; border-radius: 10px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; white-space: pre-wrap; color: #a7f3d0; margin-bottom: 14px; }
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+    .modal-backdrop.open { display: flex; }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; }
+    .modal-title { font-size: 16px; font-weight: 800; margin-bottom: 14px; color: #fff; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+    .form-control { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 14px; outline: none; }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #10b981; color: #fff; font-weight: 700; font-size: 13px; padding: 10px 20px; border-radius: 30px; z-index: 999; transition: all 0.3s ease; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); background: #0f172a; margin-bottom: 4px; border-radius: 6px; }
+    .list-item span { font-weight: bold; font-size: 14px; }
+    .text-green { color: #4ade80 !important; }
+    .text-red { color: #f87171 !important; }
+
+    .save-slots-container { display: flex; overflow-x: auto; gap: 8px; padding: 10px 14px; background: #1e293b; border-bottom: 1px solid #334155; scrollbar-width: none; }
+    .save-slots-container::-webkit-scrollbar { display: none; }
+    .slot-group { display: flex; gap: 4px; align-items: center; }
+    .btn-slot-view { background: #166534; border: 1px solid #14532d; color: #4ade80; font-weight: bold; font-size: 13px; padding: 8px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+    .btn-slot-view.active { background: #22c55e; color: #fff; border-color: #16a34a; }
+    .btn-slot-save { background: #334155; border: 1px solid #1e293b; color: #94a3b8; font-weight: bold; font-size: 13px; padding: 8px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+    .btn-slot-overwrite { background: #334155; border: 1px solid #1e293b; color: #94a3b8; font-size: 13px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+    .btn-slot-save:active, .btn-slot-overwrite:active, .btn-slot-view:active { transform: scale(0.95); }
+    .btn-slot-save:hover, .btn-slot-overwrite:hover { background: #475569; color:#f8fafc; }
+
+    /* Voice Button */
+    .voice-btn { position: fixed; bottom: 80px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #3b82f6; border: none; color: white; font-size: 24px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .voice-btn:active { transform: scale(0.9); }
+    .voice-btn.listening { background: #ef4444; box-shadow: 0 0 16px rgba(239, 68, 68, 0.8); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast">✓ Copied to clipboard!</div>
+  
+  <button id="voiceBtn" class="voice-btn" onclick="toggleVoiceRecognition()">🎙️</button>
+
+  <header>
+    <div class="top-bar">
+      <div class="report-badge-container">
+        <input type="text" id="reportTitleInput" class="report-title-input" value="3rd report" onchange="saveData()">
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-danger" onclick="clearCurrentData()" style="padding: 6px 10px;" title="Clear All Input">🧹 Clear</button>
+        <button class="btn btn-secondary" onclick="forceSave()" style="padding: 6px 10px;">💾 Save</button>
+        <button class="btn btn-primary" onclick="startNewReport()">➕ New</button>
+        <button class="btn btn-success" onclick="exportToExcel()">📥 Excel</button>
+      </div>
+    </div>
+  </header>
+  
+  <div class="save-slots-container" id="saveSlotsContainer"></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnEntry" onclick="switchTab('entry')">📱 Mobile Entry</button>
+    <button class="tab-btn" id="tabBtnSummary" onclick="switchTab('summary')">📊 Summary</button>
+    <button class="tab-btn" id="tabBtnSettings" onclick="switchTab('settings')">⚙️ Settings</button>
+  </div>
+
+  <main class="content-container">
+    <div id="historyBanner" style="display:none; background: #ef4444; color: #fff; padding: 12px; border-radius: 8px; margin-bottom: 16px; align-items: center; justify-content: space-between; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
+      <span id="historyBannerTitle"></span>
+      <button class="btn btn-success" style="padding: 6px 12px; font-size: 12px; color:#fff;" onclick="exitHistoryView()">💾 Save & Exit</button>
+    </div>
+    
+    <!-- ENTRY VIEW -->
+    <div id="entryView">
+      <div class="group-chips" id="groupChipsContainer"></div>
+      <div id="groupsContainer"></div>
+    </div>
+
+    <!-- SUMMARY VIEW -->
+    <div id="summaryView" style="display: none;">
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">TOTAL 1C</div><div class="kpi-value" style="color: #38bdf8;" id="kpi1C">0</div></div>
+        <div class="kpi-card"><div class="kpi-label">TOTAL 2C</div><div class="kpi-value" style="color: #4ade80;" id="kpi2C">0</div></div>
+        <div class="kpi-card"><div class="kpi-label">TOTAL 3C</div><div class="kpi-value" style="color: #fb923c;" id="kpi3C">0</div></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-header">
+          <div>
+            <h3 id="summaryTitleDisplay">Summary</h3>
+          </div>
+          <button class="btn btn-primary" onclick="copyWhatsAppReport()">📋 Copy Text</button>
+        </div>
+        <table class="sum-table">
+          <thead>
+            <tr><th style="text-align: left;">Group</th><th>1C</th><th>2C</th><th>3C</th><th>Total</th><th>Prev</th></tr>
+          </thead>
+          <tbody id="summaryTableBody"></tbody>
+        </table>
+        <div class="whatsapp-preview" id="whatsappPreview"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div id="settingsView" style="display: none;">
+      <div class="summary-card">
+        <div class="summary-header">
+          <h3>Bulk Entry (Totals)</h3>
+          <button class="btn btn-success" onclick="openBulkEntryModal()">✏️ Quick Entry</button>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted)">Enter yesterday's totals serially for all members at once.</p>
+      </div>
+      <div class="summary-card">
+        <div class="summary-header">
+          <h3>Manage Groups</h3>
+          <button class="btn btn-primary" onclick="openAddGroupModal()">+ Add Group</button>
+        </div>
+        <div id="settingsGroupsList"></div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-header">
+          <h3 id="settingsMembersTitle">Select a group to manage members</h3>
+          <button class="btn btn-success" id="btnAddMember" style="display:none;" onclick="openAddMemberModal()">+ Add Member</button>
+        </div>
+        <div id="settingsMembersList"></div>
+      </div>
+      <div class="summary-card">
+          <div class="summary-header">
+              <h3>Report History</h3>
+          </div>
+          <div id="settingsHistoryList"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Keypad Removed -->
+
+  <!-- Modals -->
+  <div class="modal-backdrop" id="genericModal">
+    <div class="modal-box">
+      <h4 class="modal-title" id="modalTitle">Title</h4>
+      <div id="modalBody"></div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="modalSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const defaultData = {
+      reportTitle: "3rd report",
+      reportHistory: [],
+      groups: [
+        { id: "JAMES", name: "JAMES", members: [
+          { name: "Lucifer", c1: "", c2: "", c3: "1", prev: 8 },
+          { name: "Flash", c1: "", c2: "", c3: "", prev: 7 },
+          { name: "Viking", c1: "1", c2: "1", c3: "1", prev: 8 }
+        ]},
+        { id: "OG", name: "OG", members: [
+          { name: "Princess", c1: "1", c2: "", c3: "", prev: 11 },
+          { name: "Moon", c1: "", c2: "", c3: "", prev: 9 }
+        ]},
+        { id: "ARAIN", name: "ARAIN", members: [
+          { name: "Arain", c1: "1", c2: "1", c3: "", prev: 12 }
+        ]}
+      ]
+    };
+
+    let appData = loadData();
+    let currentFilter = 'ALL';
+    let activeCell = null;
+    let selectedGroupForMembers = null;
+    let viewingHistoryIdx = null;
+    let viewingSlotIdx = null; // New slot viewing logic
+
+    function loadData() {
+      const saved = localStorage.getItem("report_app_data_v2");
+      let data = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultData));
+      if (!data.saveSlots) data.saveSlots = [null, null, null, null, null, null];
+      return data;
+    }
+
+    function saveData() {
+      const val = document.getElementById("reportTitleInput").value || "Report";
+      if (viewingSlotIdx !== null) {
+        appData.saveSlots[viewingSlotIdx].title = val;
+      } else if (viewingHistoryIdx !== null) {
+        if (appData.reportHistory && appData.reportHistory[viewingHistoryIdx]) {
+          appData.reportHistory[viewingHistoryIdx].title = val;
+        }
+      } else {
+        appData.reportTitle = val;
+      }
+      localStorage.setItem("report_app_data_v2", JSON.stringify(appData));
+      updateSummary();
+    }
+
+    function forceSave() {
+      saveData();
+      showToast("💾 Progress Saved!");
+    }
+
+    function numVal(val) {
+      if (val === '' || val === null || val === undefined) return 0;
+      if (val.toString().toLowerCase() === 'x') return 0;
+      const n = parseInt(val, 10);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function renderApp() {
+      let title = appData.reportTitle;
+      if (viewingSlotIdx !== null) title = appData.saveSlots[viewingSlotIdx].title;
+      else if (viewingHistoryIdx !== null) title = appData.reportHistory[viewingHistoryIdx].title;
+      
+      document.getElementById("reportTitleInput").value = title;
+      
+      const banner = document.getElementById("historyBanner");
+      if (viewingHistoryIdx !== null && viewingSlotIdx === null) {
+        banner.style.display = "flex";
+        document.getElementById("historyBannerTitle").innerText = `🔴 EDITING PAST REPORT: ${title}`;
+      } else {
+        banner.style.display = "none";
+      }
+
+      renderSaveSlots();
+      renderChips();
+      renderGroups();
+      renderSettings();
+      updateSummary();
+    }
+
+    function renderSaveSlots() {
+      const container = document.getElementById("saveSlotsContainer");
+      let html = "";
+      appData.saveSlots.forEach((slot, i) => {
+        const num = i + 1;
+        if (slot) {
+          const isActive = viewingSlotIdx === i;
+          html += `<div class="slot-group">
+                     <button class="btn-slot-view ${isActive ? 'active' : ''}" onclick="viewSlot(${i})">${isActive ? '👁️ Viewing '+num : '👁️ View '+num}</button>
+                     <button class="btn-slot-overwrite" onclick="saveToSlot(${i})" title="Overwrite Slot ${num}">💾</button>
+                   </div>`;
+        } else {
+          html += `<div class="slot-group">
+                     <button class="btn-slot-save" onclick="saveToSlot(${i})">💾 Save ${num}</button>
+                   </div>`;
+        }
+      });
+      container.innerHTML = html;
+    }
+
+    function saveToSlot(idx) {
+      if (appData.saveSlots[idx]) {
+        if (!confirm(`Overwrite Save Slot ${idx + 1}?`)) return;
+      }
+      
+      // If we are currently viewing another slot, save THAT data to this slot. Otherwise save main working data.
+      let sourceGroups = appData.groups;
+      let sourceTitle = appData.reportTitle;
+      if (viewingSlotIdx !== null) {
+        sourceGroups = appData.saveSlots[viewingSlotIdx].groups;
+        sourceTitle = appData.saveSlots[viewingSlotIdx].title;
+      }
+      
+      appData.saveSlots[idx] = {
+        title: sourceTitle + ` (Slot ${idx + 1})`,
+        date: new Date().toLocaleString(),
+        groups: JSON.parse(JSON.stringify(sourceGroups))
+      };
+      
+      saveData();
+      showToast(`💾 Saved to Slot ${idx + 1}`);
+      renderApp();
+    }
+    
+    function viewSlot(idx) {
+      if (viewingSlotIdx === idx) {
+        // Toggle off
+        viewingSlotIdx = null;
+      } else {
+        viewingSlotIdx = idx;
+        viewingHistoryIdx = null; // Clear history mode if active
+      }
+      switchTab('entry');
+      renderApp();
+    }
+
+    function renderChips() {
+      const container = document.getElementById("groupChipsContainer");
+      container.innerHTML = `<button class="chip ${currentFilter==='ALL'?'active-all':''}" onclick="filterGroup('ALL')">All</button>`;
+      appData.groups.forEach(g => {
+        container.innerHTML += `<button class="chip ${currentFilter===g.id?'active-group':''}" onclick="filterGroup('${g.id}')">${g.name} (${g.members.length})</button>`;
+      });
+    }
+
+    function filterGroup(id) { currentFilter = id; renderApp(); }
+
+    function renderGroups() {
+      const container = document.getElementById("groupsContainer");
+      container.innerHTML = "";
+      appData.groups.forEach((group, gIdx) => {
+        if (currentFilter !== 'ALL' && currentFilter !== group.id) return;
+        let tot1C = 0, tot2C = 0, tot3C = 0, totPrev = 0, presentCount = 0, absentCount = 0;
+        group.members.forEach(m => { 
+          tot1C += numVal(m.c1); tot2C += numVal(m.c2); tot3C += numVal(m.c3); totPrev += numVal(m.prev);
+          if (m.absent) absentCount++; else presentCount++;
+        });
+        const gCurTot = tot1C + tot2C + tot3C;
+        
+        let html = `<div class="group-section">
+          <div class="group-header-card">
+            <span>${group.name}</span>
+            <div style="display:flex; gap:4px;">
+              <span class="group-pill-stat" style="background:#16a34a">P: ${presentCount}</span>
+              <span class="group-pill-stat" style="background:#dc2626">A: ${absentCount}</span>
+              <span class="group-pill-stat">Cur: ${gCurTot}</span> 
+              <span class="group-pill-stat" style="background:rgba(0,0,0,0.5)">Prv: ${totPrev}</span>
+            </div>
+          </div>
+          <table class="member-table">
+            <thead><tr><th style="width:26px">#</th><th style="text-align:left;padding-left:10px">Name</th><th>1C</th><th>2C</th><th>3C</th><th style="color:#c084fc">Total</th></tr></thead>
+            <tbody>`;
+        
+        group.members.forEach((m, mIdx) => {
+          const cur = numVal(m.c1) + numVal(m.c2) + numVal(m.c3);
+          const pr = numVal(m.prev);
+          let colorClass = "";
+          if (cur > 0 || pr > 0) {
+              if (cur < pr) colorClass = "text-red";
+              else colorClass = "text-green";
+          }
+          
+          html += `<tr style="${m.absent ? 'opacity:0.6;' : ''}">
+            <td class="member-idx">${mIdx + 1}</td>
+            <td class="member-name">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="max-width:70px; overflow:hidden; text-overflow:ellipsis;" onclick="openEditMemberModal(${gIdx}, ${mIdx})">${m.name}</span>
+                <button class="btn btn-${m.absent ? 'danger' : 'success'}" style="padding:2px 6px; font-size:9px; border-radius:4px;" onclick="toggleAbsent(${gIdx}, ${mIdx})">${m.absent ? 'OFF' : 'ON'}</button>
+              </div>
+            </td>
+            <td><input type="text" class="${getInputClass(m.c1)}" value="${m.c1 === 'x' ? 'X' : m.c1}" onfocus="this.select()" onchange="updateCell(${gIdx}, ${mIdx}, 'c1', this)" onkeydown="handleArrowKeys(event, ${gIdx}, ${mIdx}, 'c1', this)"></td>
+            <td><input type="text" class="${getInputClass(m.c2)}" value="${m.c2 === 'x' ? 'X' : m.c2}" onfocus="this.select()" onchange="updateCell(${gIdx}, ${mIdx}, 'c2', this)" onkeydown="handleArrowKeys(event, ${gIdx}, ${mIdx}, 'c2', this)"></td>
+            <td><input type="text" class="${getInputClass(m.c3)}" value="${m.c3 === 'x' ? 'X' : m.c3}" onfocus="this.select()" onchange="updateCell(${gIdx}, ${mIdx}, 'c3', this)" onkeydown="handleArrowKeys(event, ${gIdx}, ${mIdx}, 'c3', this)"></td>
+            <td>
+               <span class="${colorClass}" style="font-weight:bold; font-size:14px;" onclick="openEditMemberModal(${gIdx}, ${mIdx})">${pr}</span>
+            </td>
+          </tr>`;
+        });
+        
+        html += `</tbody><tfoot><tr class="group-footer-row"><td></td><td style="text-align:right;padding-right:8px">TOTAL</td><td>${tot1C}</td><td>${tot2C}</td><td>${tot3C}</td><td>${totPrev}</td></tr></tfoot></table></div>`;
+        container.innerHTML += html;
+      });
+    }
+
+    function toggleAbsent(gIdx, mIdx) {
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      const m = targetGroups[gIdx].members[mIdx];
+      m.absent = !m.absent;
+      if (m.absent) {
+        m.c1 = ''; m.c2 = ''; m.c3 = '';
+      }
+      saveData();
+      renderApp();
+    }
+
+    function openEditMemberModal(gIdx, mIdx) {
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      const m = targetGroups[gIdx].members[mIdx];
+      showModal("Edit Member", `<div class="form-group"><label>Name</label><input type="text" id="mNameInp" class="form-control" value="${m.name}"></div>`, () => {
+        const n = document.getElementById("mNameInp").value.trim();
+        if(n) { m.name = n; saveData(); renderApp(); closeModal(); }
+      });
+    }
+
+    function getInputClass(val) {
+      let cls = "cell-inline-input";
+      if (val !== '') cls += " val-num";
+      return cls;
+    }
+
+    function updateCell(gIdx, mIdx, field, elem) {
+      let val = elem.value.trim().toLowerCase();
+      
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      if (val === '') {
+        targetGroups[gIdx].members[mIdx][field] = '';
+        saveData();
+        renderGroups();
+        return;
+      }
+
+      const tokens = val.match(/\d+|x/g) || [];
+      if (tokens.length === 0) {
+        const oldVal = targetGroups[gIdx].members[mIdx][field];
+        elem.value = (oldVal === 'x') ? 'X' : oldVal;
+        return;
+      }
+      
+      const fields = ['c1', 'c2', 'c3'];
+      const startIndex = fields.indexOf(field);
+      
+      let tokenIdx = 0;
+      for (let i = startIndex; i < fields.length; i++) {
+        if (tokenIdx < tokens.length) {
+          let t = tokens[tokenIdx];
+          if (t === 'x') {
+            targetGroups[gIdx].members[mIdx][fields[i]] = 'x';
+          } else {
+            targetGroups[gIdx].members[mIdx][fields[i]] = parseInt(t);
+          }
+          tokenIdx++;
+        }
+      }
+      
+      saveData();
+      renderGroups();
+    }
+
+    function handleArrowKeys(e, gIdx, mIdx, field, elem) {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault(); 
+        
+        let nextGIdx = gIdx;
+        let nextMIdx = mIdx;
+        let nextField = field;
+        const gList = appData.groups;
+        
+        if (e.key === 'ArrowRight') {
+          if (field === 'c1') nextField = 'c2';
+          else if (field === 'c2') nextField = 'c3';
+        } else if (e.key === 'ArrowLeft') {
+          if (field === 'c3') nextField = 'c2';
+          else if (field === 'c2') nextField = 'c1';
+        } else if (e.key === 'ArrowDown') {
+          if (mIdx + 1 < gList[gIdx].members.length) {
+            nextMIdx++;
+          } else if (gIdx + 1 < gList.length) {
+            nextGIdx++;
+            nextMIdx = 0;
+          }
+        } else if (e.key === 'ArrowUp') {
+          if (mIdx > 0) {
+            nextMIdx--;
+          } else if (gIdx > 0) {
+            nextGIdx--;
+            nextMIdx = gList[nextGIdx].members.length - 1;
+          }
+        }
+
+        const targetStr = `updateCell(${nextGIdx}, ${nextMIdx}, '${nextField}', this)`;
+        const inputs = document.querySelectorAll('.cell-inline-input');
+        for(let i=0; i<inputs.length; i++) {
+           if (inputs[i].getAttribute('onchange') === targetStr) {
+               inputs[i].focus();
+               inputs[i].select();
+               break;
+           }
+        }
+      }
+    }
+
+    function switchTab(tab) {
+      document.getElementById("entryView").style.display = tab === 'entry' ? "block" : "none";
+      document.getElementById("summaryView").style.display = tab === 'summary' ? "block" : "none";
+      document.getElementById("settingsView").style.display = tab === 'settings' ? "block" : "none";
+      document.getElementById("tabBtnEntry").className = "tab-btn" + (tab === 'entry' ? " active" : "");
+      document.getElementById("tabBtnSummary").className = "tab-btn" + (tab === 'summary' ? " active" : "");
+      document.getElementById("tabBtnSettings").className = "tab-btn" + (tab === 'settings' ? " active" : "");
+      if (tab !== 'entry') closeKeypad();
+    }
+
+    function updateSummary() {
+      let g1=0, g2=0, g3=0, gPrv=0, gCur=0, totalP=0, totalA=0;
+      const tbody = document.getElementById("summaryTableBody");
+      if(!tbody) return;
+      tbody.innerHTML = "";
+      
+      let title = appData.reportTitle;
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) { title = appData.saveSlots[viewingSlotIdx].title; targetGroups = appData.saveSlots[viewingSlotIdx].groups; }
+      else if (viewingHistoryIdx !== null) { title = appData.reportHistory[viewingHistoryIdx].title; targetGroups = appData.reportHistory[viewingHistoryIdx].groups; }
+      
+      let txt = `📊 *${title.toUpperCase()} SUMMARY*\n━━━━━━━━━━━━━━━━━━━\n`;
+      
+      targetGroups.forEach(g => {
+        let t1=0, t2=0, t3=0, tp=0, p=0, a=0;
+        g.members.forEach(m => { 
+          t1+=numVal(m.c1); t2+=numVal(m.c2); t3+=numVal(m.c3); tp+=numVal(m.prev);
+          if (m.absent) a++; else p++;
+        });
+        const tc = t1+t2+t3;
+        g1+=t1; g2+=t2; g3+=t3; gPrv+=tp; gCur+=tc; totalP+=p; totalA+=a;
+        tbody.innerHTML += `<tr><td style="text-align:left;padding-left:10px;font-weight:bold">${g.name}</td><td>${t1}</td><td>${t2}</td><td>${t3}</td><td style="color:#38bdf8">${tc}</td><td>${tp}</td></tr>`;
+        txt += `🔹 *${g.name}* (P:${p} | A:${a})\n  1C: ${t1} | 2C: ${t2} | 3C: ${t3}\n  👉 *Total: ${tc}* (Prev: ${tp})\n\n`;
+      });
+      tbody.innerHTML += `<tr style="background:#d97706;color:#000;font-weight:bold"><td style="text-align:left;padding-left:10px;">GRAND TOTAL</td><td>${g1}</td><td>${g2}</td><td>${g3}</td><td>${gCur}</td><td>${gPrv}</td></tr>`;
+      
+      document.getElementById("kpi1C").innerText = g1; document.getElementById("kpi2C").innerText = g2; document.getElementById("kpi3C").innerText = g3;
+      document.getElementById("summaryTitleDisplay").innerText = `${title} (P: ${totalP}, A: ${totalA})`;
+      txt += `━━━━━━━━━━━━━━━━━━━\n👥 *HEADCOUNT: ${totalP} Present, ${totalA} Absent*\n🏆 *GRAND TOTAL: ${gCur}*\n(1C: ${g1} | 2C: ${g2} | 3C: ${g3})`;
+      document.getElementById("whatsappPreview").innerText = txt;
+    }
+
+    // --- Settings & New Report ---
+    function clearCurrentData() {
+      if (!confirm("Are you sure you want to clear all entered data in this report? (Previous totals will NOT be deleted)")) return;
+      
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      targetGroups.forEach(g => {
+        g.members.forEach(m => {
+          if (!m.absent) {
+            m.c1 = ''; m.c2 = ''; m.c3 = '';
+          }
+        });
+      });
+      saveData();
+      renderApp();
+      showToast("🧹 Data Cleared!");
+    }
+
+    function startNewReport() {
+      const title = prompt("Enter new report title (e.g., 4th report):", "New Report");
+      if (!title) return;
+      
+      // Save current to history
+      appData.reportHistory = appData.reportHistory || [];
+      appData.reportHistory.push({
+          title: appData.reportTitle,
+          date: new Date().toLocaleString(),
+          groups: JSON.parse(JSON.stringify(appData.groups))
+      });
+
+      // Reset c1/c2/c3 for the new report (keep prev data intact)
+      appData.groups.forEach(g => {
+        g.members.forEach(m => {
+          m.c1 = "x"; m.c2 = "x"; m.c3 = "x";
+        });
+      });
+      
+      appData.reportTitle = title;
+      saveData();
+      renderApp();
+      showToast("New report started!");
+    }
+
+    function renderSettings() {
+      const gl = document.getElementById("settingsGroupsList");
+      gl.innerHTML = "";
+      appData.groups.forEach((g, idx) => {
+        gl.innerHTML += `<div class="list-item">
+          <span style="cursor:pointer; color:#38bdf8;" onclick="selectSettingsGroup(${idx})">${g.name} (${g.members.length} members)</span>
+          <button class="btn btn-danger" style="padding:4px 8px;font-size:10px" onclick="deleteGroup(${idx})">Del</button>
+        </div>`;
+      });
+
+      const ml = document.getElementById("settingsMembersList");
+      if (selectedGroupForMembers !== null && appData.groups[selectedGroupForMembers]) {
+        const g = appData.groups[selectedGroupForMembers];
+        document.getElementById("settingsMembersTitle").innerText = `Members of ${g.name}`;
+        document.getElementById("btnAddMember").style.display = "inline-flex";
+        ml.innerHTML = "";
+        g.members.forEach((m, idx) => {
+          ml.innerHTML += `<div class="list-item">
+            <span>${m.name}</span>
+            <div>
+              <button class="btn btn-secondary" style="padding:4px 8px;font-size:10px" onclick="openEditMemberModal(${selectedGroupForMembers}, ${idx})">Edit</button>
+              <button class="btn btn-danger" style="padding:4px 8px;font-size:10px" onclick="deleteMember(${selectedGroupForMembers}, ${idx})">Del</button>
+            </div>
+          </div>`;
+        });
+      } else {
+        document.getElementById("settingsMembersTitle").innerText = "Select a group to manage members";
+        document.getElementById("btnAddMember").style.display = "none";
+        ml.innerHTML = "";
+      }
+      
+      const hl = document.getElementById("settingsHistoryList");
+      hl.innerHTML = "";
+      if (appData.reportHistory && appData.reportHistory.length > 0) {
+          appData.reportHistory.forEach((h, idx) => {
+             hl.innerHTML += `<div class="list-item">
+               <span>${h.title}</span>
+               <div style="display:flex; gap:6px; align-items:center;">
+                 <span style="font-size:10px;color:#94a3b8;margin-right:4px;">${h.date}</span>
+                 <button class="btn btn-primary" style="padding:4px 6px;font-size:10px" onclick="viewHistoryReport(${idx})">👁️ View</button>
+                 <button class="btn btn-secondary" style="padding:4px 6px;font-size:10px" onclick="editHistoryReport(${idx})">✏️</button>
+                 <button class="btn btn-danger" style="padding:4px 6px;font-size:10px" onclick="deleteHistoryReport(${idx})">🗑️</button>
+                 <button class="btn btn-success" style="padding:4px 6px;font-size:10px" onclick="exportHistoryToExcel(${idx})">📥 Excel</button>
+               </div>
+             </div>`;
+          });
+      } else {
+          hl.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">No previous reports saved.</span>`;
+      }
+    }
+
+    function selectSettingsGroup(idx) { selectedGroupForMembers = idx; renderSettings(); }
+
+    function openAddGroupModal() {
+      showModal("Add Group", `<div class="form-group"><label>Group Name</label><input type="text" id="mGroupInp" class="form-control"></div>`, () => {
+        const n = document.getElementById("mGroupInp").value.trim();
+        if(n) { appData.groups.push({ id: n.toUpperCase(), name: n, members: [] }); saveData(); renderSettings(); renderChips(); closeModal(); }
+      });
+    }
+
+    function deleteGroup(idx) {
+      showModal("Confirm Delete", `<p style="color: #fff; font-size: 14px;">Delete group <b>${appData.groups[idx].name}</b>?</p>`, () => {
+        appData.groups.splice(idx, 1);
+        if(selectedGroupForMembers === idx) selectedGroupForMembers = null;
+        else if(selectedGroupForMembers > idx) selectedGroupForMembers--;
+        saveData(); renderApp(); closeModal();
+      });
+    }
+
+    function openAddMemberModal() {
+      showModal("Add Member", `<div class="form-group"><label>Name</label><input type="text" id="mMemInp" class="form-control"></div><div class="form-group"><label>Prev Data</label><input type="number" id="mPrevInp" class="form-control" value="0"></div>`, () => {
+        const n = document.getElementById("mMemInp").value.trim();
+        const p = parseInt(document.getElementById("mPrevInp").value)||0;
+        if(n) { appData.groups[selectedGroupForMembers].members.push({ name:n, c1:"x", c2:"x", c3:"x", prev:p }); saveData(); renderSettings(); closeModal(); }
+      });
+    }
+
+    function openEditMemberModal(gIdx, mIdx) {
+      const m = appData.groups[gIdx].members[mIdx];
+      showModal("Edit Member", `<div class="form-group"><label>Name</label><input type="text" id="mMemInp" class="form-control" value="${m.name}"></div><div class="form-group"><label>Prev Data</label><input type="number" id="mPrevInp" class="form-control" value="${m.prev}"></div>`, () => {
+        m.name = document.getElementById("mMemInp").value.trim() || m.name;
+        m.prev = parseInt(document.getElementById("mPrevInp").value)||0;
+        saveData(); renderSettings(); renderGroups(); closeModal();
+      });
+    }
+
+    function deleteMember(gIdx, mIdx) {
+      showModal("Confirm Delete", `<p style="color: #fff; font-size: 14px;">Delete member <b>${appData.groups[gIdx].members[mIdx].name}</b>?</p>`, () => {
+        appData.groups[gIdx].members.splice(mIdx, 1); saveData(); renderSettings(); renderGroups(); closeModal();
+      });
+    }
+
+    function openBulkEntryModal() {
+      let namesHtml = "";
+      let valuesText = "";
+      let totalMembers = 0;
+      
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      targetGroups.forEach((g) => {
+        g.members.forEach((m) => {
+          namesHtml += `<div style="font-family: 'JetBrains Mono', monospace; font-size:13px; height: 28px; line-height: 28px; white-space: nowrap; overflow-x: auto; scrollbar-width: none;">
+            <span style="color:#64748b">${g.name} -</span> <span style="color:#e2e8f0; font-weight: bold;">${m.name}</span>
+          </div>`;
+          valuesText += `${m.prev}\n`;
+          totalMembers++;
+        });
+      });
+
+      let html = `
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Paste any text containing your totals. It will automatically extract all numbers in order and apply them to the <b>${totalMembers}</b> members.</p>
+      <div style="background: #0f172a; padding: 10px 4px 10px 10px; border-radius: 8px; border: 1px solid #334155; max-height: 350px; overflow-y: auto;">
+        <div style="display:flex; gap:10px;">
+          <div style="flex: 2; overflow: hidden; color: #94a3b8; padding-top: 8px;">
+            ${namesHtml}
+          </div>
+          <textarea id="bulkTextarea" class="form-control" style="flex: 1; min-width: 60px; height: ${totalMembers * 28 + 16}px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 28px; resize: none; padding: 8px 8px; font-weight: bold; overflow-wrap: normal; overflow: auto; border: none; background: transparent; outline: none; box-shadow: none;">${valuesText.trim()}</textarea>
+        </div>
+      </div>
+      <style>.group-names-scroll::-webkit-scrollbar { display: none; }</style>`;
+      
+      showModal("Smart Bulk Entry", html, () => {
+        const text = document.getElementById("bulkTextarea").value.trim();
+        const numbers = text.match(/\d+/g) || [];
+        let numIdx = 0;
+        targetGroups.forEach((g) => {
+          g.members.forEach((m) => {
+            if (numIdx < numbers.length) {
+              m.prev = parseInt(numbers[numIdx]);
+              numIdx++;
+            } else {
+              m.prev = 0;
+            }
+          });
+        });
+        saveData();
+        renderApp();
+        closeModal();
+      });
+    }
+
+    function showModal(title, html, onSave) {
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalBody").innerHTML = html;
+      const btn = document.getElementById("modalSaveBtn");
+      btn.onclick = onSave;
+      document.getElementById("genericModal").classList.add("open");
+    }
+    function closeModal() { document.getElementById("genericModal").classList.remove("open"); }
+
+    function copyWhatsAppReport() {
+      const text = document.getElementById("whatsappPreview").innerText;
+      navigator.clipboard.writeText(text).then(()=>showToast("✓ Copied report to clipboard!")).catch(()=>{
+        const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); showToast("✓ Copied!");
+      });
+    }
+    function showToast(msg) { const t = document.getElementById("toast"); t.innerText = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2500); }
+
+    function exportToExcel() {
+      let title = appData.reportTitle;
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) { title = appData.saveSlots[viewingSlotIdx].title; targetGroups = appData.saveSlots[viewingSlotIdx].groups; }
+      else if (viewingHistoryIdx !== null) { title = appData.reportHistory[viewingHistoryIdx].title; targetGroups = appData.reportHistory[viewingHistoryIdx].groups; }
+      
+      const wb = XLSX.utils.book_new();
+      const er = [[title], ["#", "Group", "Name", "1C", "2C", "3C", "Prev Total"]];
+      targetGroups.forEach(g => { g.members.forEach((m, i) => er.push([i+1, g.name, m.name, m.c1, m.c2, m.c3, m.prev])); });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(er), "Data Entry");
+      XLSX.writeFile(wb, `${title.replace(/\s+/g,'_')}.xlsx`);
+      showToast("📥 Exported Excel");
+    }
+
+    function exportHistoryToExcel(idx) {
+      const h = appData.reportHistory[idx];
+      if (!h) return;
+      const wb = XLSX.utils.book_new();
+      const er = [[h.title], ["#", "Group", "Name", "1C", "2C", "3C", "Prev Total"]];
+      h.groups.forEach(g => { g.members.forEach((m, i) => er.push([i+1, g.name, m.name, m.c1, m.c2, m.c3, m.prev])); });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(er), "Data Entry");
+      XLSX.writeFile(wb, `${h.title.replace(/\s+/g,'_')}_Backup.xlsx`);
+      showToast("📥 Exported Backup Excel");
+    }
+
+    function editHistoryReport(idx) {
+      const h = appData.reportHistory[idx];
+      showModal("Edit Report Name", `<div class="form-group"><label>Report Title</label><input type="text" id="editHistTitle" class="form-control" value="${h.title}"></div>`, () => {
+        const val = document.getElementById("editHistTitle").value.trim();
+        if (val) {
+          appData.reportHistory[idx].title = val;
+          saveData();
+          renderSettings();
+          closeModal();
+        }
+      });
+    }
+
+    function deleteHistoryReport(idx) {
+      const h = appData.reportHistory[idx];
+      showModal("Confirm Delete", `<p style="color: #fff; font-size: 14px;">Are you sure you want to permanently delete the report backup <b>${h.title}</b>?</p>`, () => {
+        appData.reportHistory.splice(idx, 1);
+        if (viewingHistoryIdx === idx) {
+          viewingHistoryIdx = null; // Kick out if deleting currently viewed
+        } else if (viewingHistoryIdx > idx) {
+          viewingHistoryIdx--; // Adjust index
+        }
+        saveData();
+        renderSettings();
+        renderApp();
+        closeModal();
+      });
+    }
+
+    function viewHistoryReport(idx) {
+      viewingHistoryIdx = idx;
+      viewingSlotIdx = null; // Clear slot mode if active
+      switchTab('entry');
+      renderApp();
+    }
+    
+    function exitHistoryView() {
+      if(viewingSlotIdx !== null || viewingHistoryIdx !== null) forceSave();
+      viewingSlotIdx = null;
+      viewingHistoryIdx = null;
+      renderApp();
+    }
+
+    function exportToExcel() {
+      let title = appData.reportTitle;
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) { title = appData.saveSlots[viewingSlotIdx].title; targetGroups = appData.saveSlots[viewingSlotIdx].groups; }
+      else if (viewingHistoryIdx !== null) { title = appData.reportHistory[viewingHistoryIdx].title; targetGroups = appData.reportHistory[viewingHistoryIdx].groups; }
+      
+      const wb = XLSX.utils.book_new();
+      const er = [[title], ["#", "Group", "Name", "1C", "2C", "3C", "Prev Total"]];
+      targetGroups.forEach(g => { 
+        g.members.forEach((m, i) => {
+          const v1 = (m.c1 === 'x') ? 0 : m.c1;
+          const v2 = (m.c2 === 'x') ? 0 : m.c2;
+          const v3 = (m.c3 === 'x') ? 0 : m.c3;
+          er.push([i+1, g.name, m.name, v1, v2, v3, m.prev]);
+        }); 
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(er), "Data Entry");
+      XLSX.writeFile(wb, `${title.replace(/\s+/g,'_')}.xlsx`);
+      showToast("📥 Exported Excel");
+    }
+
+    function openBulkEntryModal() {
+      let namesHtml = "";
+      let valuesText = "";
+      let totalMembers = 0;
+      
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+      
+      targetGroups.forEach((g) => {
+        g.members.forEach((m) => {
+          namesHtml += `<div style="font-family: 'JetBrains Mono', monospace; font-size:13px; height: 28px; line-height: 28px; white-space: nowrap; overflow-x: auto; scrollbar-width: none;">
+            <span style="color:#64748b">${g.name} -</span> <span style="color:#e2e8f0; font-weight: bold;">${m.name}</span>
+          </div>`;
+          valuesText += `${m.prev}\n`;
+          totalMembers++;
+        });
+      });
+
+      let html = `
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Paste any text containing your totals. It will automatically extract all numbers in order and apply them to the <b>${totalMembers}</b> members.</p>
+      <div style="background: #0f172a; padding: 10px 4px 10px 10px; border-radius: 8px; border: 1px solid #334155; max-height: 350px; overflow-y: auto;">
+        <div style="display:flex; gap:10px;">
+          <div style="flex: 2; overflow: hidden; color: #94a3b8; padding-top: 8px;">
+            ${namesHtml}
+          </div>
+          <textarea id="bulkTextarea" class="form-control" style="flex: 1; min-width: 60px; height: ${totalMembers * 28 + 16}px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 28px; resize: none; padding: 8px 8px; font-weight: bold; overflow-wrap: normal; overflow: auto; border: none; background: transparent; outline: none; box-shadow: none;">${valuesText.trim()}</textarea>
+        </div>
+      </div>
+      <style>.group-names-scroll::-webkit-scrollbar { display: none; }</style>`;
+      
+      showModal("Smart Bulk Entry", html, () => {
+        const text = document.getElementById("bulkTextarea").value.trim();
+        const numbers = text.match(/\d+/g) || [];
+        let numIdx = 0;
+        targetGroups.forEach((g) => {
+          g.members.forEach((m) => {
+            if (numIdx < numbers.length) {
+              m.prev = parseInt(numbers[numIdx]);
+              numIdx++;
+            } else {
+              m.prev = 0;
+            }
+          });
+        });
+        saveData();
+        renderApp();
+        closeModal();
+      });
+    }
+
+    // --- Voice Assistant ---
+    let recognition = null;
+    let isListening = false;
+
+    window.addEventListener('load', () => {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) {
+        document.getElementById("voiceBtn").style.display = "none";
+      }
+    });
+
+    function initSpeechRecognition() {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) return;
+      
+      recognition = new Speech();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = function() {
+        isListening = true;
+        document.getElementById("voiceBtn").classList.add("listening");
+        showToast("🎙️ Listening... Say 'Name numbers' (e.g. 'Flash 1 0 5')");
+      };
+      
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        processVoiceCommand(transcript);
+      };
+      
+      recognition.onerror = function(event) {
+        showToast("🎙️ Error: " + event.error);
+        stopListening();
+      };
+      
+      recognition.onend = function() {
+        stopListening();
+      };
+    }
+
+    function toggleVoiceRecognition() {
+      if (!recognition) initSpeechRecognition();
+      if (!recognition) return;
+      
+      if (isListening) recognition.stop();
+      else recognition.start();
+    }
+
+    function stopListening() {
+      isListening = false;
+      document.getElementById("voiceBtn").classList.remove("listening");
+    }
+
+    function processVoiceCommand(text) {
+      const wordMap = { "zero":"0", "one":"1", "two":"2", "three":"3", "four":"4", "five":"5", "six":"6", "seven":"7", "eight":"8", "nine":"9", "ten":"10", "x":"x", "ex":"x", "cross":"x", "blank":"x", "empty":"x" };
+      
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+
+      let matchedG = -1, matchedM = -1, matchedName = "";
+      for (let g=0; g<targetGroups.length; g++) {
+        for (let m=0; m<targetGroups[g].members.length; m++) {
+          const mName = targetGroups[g].members[m].name.toLowerCase();
+          if (text.includes(mName)) {
+            matchedG = g; matchedM = m; matchedName = mName; break;
+          }
+        }
+        if (matchedM !== -1) break;
+      }
+      
+      if (matchedM === -1) { showToast("❌ Could not recognize name."); return; }
+      
+      const afterStr = text.substring(text.indexOf(matchedName) + matchedName.length).trim();
+      const rawTokens = afterStr.split(/\s+/);
+      const finalTokens = [];
+      
+      rawTokens.forEach(t => {
+        if (/\d+/.test(t)) {
+          const nums = t.match(/\d+/g);
+          if (nums) nums.forEach(n => finalTokens.push(n));
+        } else if (wordMap[t] !== undefined) {
+          finalTokens.push(wordMap[t]);
+        }
+      });
+      
+      if (finalTokens.length > 0) {
+        const member = targetGroups[matchedG].members[matchedM];
+        if (finalTokens.length > 0) member.c1 = finalTokens[0] === 'x' ? 'x' : parseInt(finalTokens[0]);
+        if (finalTokens.length > 1) member.c2 = finalTokens[1] === 'x' ? 'x' : parseInt(finalTokens[1]);
+        if (finalTokens.length > 2) member.c3 = finalTokens[2] === 'x' ? 'x' : parseInt(finalTokens[2]);
+        saveData();
+        renderApp();
+        showToast(`✅ Updated ${member.name}: ${finalTokens.slice(0,3).join(' ')}`);
+      } else {
+        showToast(`Heard ${matchedName} but no valid numbers.`);
+      }
+    }
+
+    renderApp();
+  </script>
+</body>
+</html>
