@@ -100,17 +100,37 @@
     .btn-slot-save:active, .btn-slot-overwrite:active, .btn-slot-view:active { transform: scale(0.95); }
     .btn-slot-save:hover, .btn-slot-overwrite:hover { background: #475569; color:#f8fafc; }
 
-    /* Voice Button */
+    /* Voice Button & Enhancements */
     .voice-btn { position: fixed; bottom: 80px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #3b82f6; border: none; color: white; font-size: 24px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
     .voice-btn:active { transform: scale(0.9); }
     .voice-btn.listening { background: #ef4444; box-shadow: 0 0 16px rgba(239, 68, 68, 0.8); animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+    .voice-status-banner { position: fixed; bottom: 145px; right: 20px; background: rgba(15, 23, 42, 0.95); border: 1px solid #3b82f6; box-shadow: 0 8px 24px rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; display: none; align-items: center; gap: 8px; z-index: 1001; }
+    .voice-status-banner.show { display: flex; }
+    .voice-pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; animation: pulseDot 1s infinite; }
+    @keyframes pulseDot { 0% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(0.9); opacity: 0.7; } }
+    
+    .voice-learning-box { background: #0f172a; border-radius: 12px; padding: 14px; border: 1px solid var(--border); margin-bottom: 14px; }
+    .voice-members-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-height: 200px; overflow-y: auto; margin-bottom: 14px; padding-right: 4px; }
+    .voice-member-btn { background: #1e293b; border: 1px solid var(--border); color: #fff; padding: 8px 10px; border-radius: 8px; font-weight: 700; font-size: 12px; text-align: left; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
+    .voice-member-btn:hover { border-color: #38bdf8; background: #243248; }
+    .voice-member-btn.selected { background: #0284c7; border-color: #38bdf8; color: #fff; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4); }
+    .voice-member-btn .suggested-tag { font-size: 9px; background: rgba(234, 179, 8, 0.25); color: #facc15; padding: 2px 5px; border-radius: 4px; font-weight: 800; }
+    
+    .alias-chip { display: inline-flex; align-items: center; gap: 4px; background: #334155; color: #e2e8f0; font-size: 11px; padding: 3px 8px; border-radius: 6px; margin: 2px 4px 2px 0; font-family: 'JetBrains Mono', monospace; }
+    .alias-chip-del { cursor: pointer; color: #f87171; font-weight: bold; padding-left: 2px; }
+    .alias-chip-del:hover { color: #ef4444; }
   </style>
 </head>
 <body>
   <div id="toast" class="toast">✓ Copied to clipboard!</div>
   
-  <button id="voiceBtn" class="voice-btn" onclick="toggleVoiceRecognition()">🎙️</button>
+  <div id="voiceStatusBanner" class="voice-status-banner">
+    <div class="voice-pulse-dot"></div>
+    <span id="voiceStatusText">Listening...</span>
+  </div>
+  <button id="voiceBtn" class="voice-btn" onclick="toggleVoiceRecognition()" title="Voice Entry">🎙️</button>
 
   <header>
     <div class="top-bar">
@@ -194,6 +214,25 @@
         <div id="settingsMembersList"></div>
       </div>
       <div class="summary-card">
+        <div class="summary-header">
+          <h3>🎙️ Voice Memory & Accent</h3>
+          <button class="btn btn-primary" onclick="openTrainVoiceModal()">+ Teach Voice</button>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+          The system remembers how you say member names so it recognizes your voice accurately.
+        </p>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:11px;">Speech Accent / Language</label>
+          <select id="voiceLangSelect" class="form-control" onchange="changeVoiceLanguage(this.value)">
+            <option value="en-IN">English (South Asia / India - en-IN)</option>
+            <option value="en-US">English (United States - en-US)</option>
+            <option value="en-GB">English (United Kingdom - en-GB)</option>
+            <option value="default">Device Default</option>
+          </select>
+        </div>
+        <div id="settingsVoiceAliasesList"></div>
+      </div>
+      <div class="summary-card">
           <div class="summary-header">
               <h3>Report History</h3>
           </div>
@@ -247,6 +286,8 @@
       const saved = localStorage.getItem("report_app_data_v2");
       let data = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultData));
       if (!data.saveSlots) data.saveSlots = [null, null, null, null, null, null];
+      if (!data.voiceAliases) data.voiceAliases = {};
+      if (!data.voiceLang) data.voiceLang = 'en-IN';
       return data;
     }
 
@@ -436,17 +477,6 @@
       renderApp();
     }
 
-    function openEditMemberModal(gIdx, mIdx) {
-      let targetGroups = appData.groups;
-      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
-      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
-      
-      const m = targetGroups[gIdx].members[mIdx];
-      showModal("Edit Member", `<div class="form-group"><label>Name</label><input type="text" id="mNameInp" class="form-control" value="${m.name}"></div>`, () => {
-        const n = document.getElementById("mNameInp").value.trim();
-        if(n) { m.name = n; saveData(); renderApp(); closeModal(); }
-      });
-    }
 
     function getInputClass(val) {
       let cls = "cell-inline-input";
@@ -468,11 +498,16 @@
         return;
       }
 
-      const tokens = val.match(/\d+|x/g) || [];
+      let tokens = val.match(/\d+|x/g) || [];
       if (tokens.length === 0) {
         const oldVal = targetGroups[gIdx].members[mIdx][field];
         elem.value = (oldVal === 'x') ? 'X' : oldVal;
         return;
+      }
+      
+      // If a multi-digit number like "100" was entered without spaces, split it into single digits!
+      if (tokens.length === 1 && tokens[0].length > 1 && !tokens[0].includes('x')) {
+        tokens = tokens[0].split('');
       }
       
       const fields = ['c1', 'c2', 'c3'];
@@ -674,6 +709,55 @@
       } else {
           hl.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">No previous reports saved.</span>`;
       }
+
+      // Render Voice Settings
+      const vlSelect = document.getElementById("voiceLangSelect");
+      if (vlSelect) {
+        vlSelect.value = appData.voiceLang || 'en-IN';
+      }
+
+      const valList = document.getElementById("settingsVoiceAliasesList");
+      if (valList) {
+        valList.innerHTML = "";
+        const voiceAliases = appData.voiceAliases || {};
+        
+        const memberAliasesMap = {};
+        appData.groups.forEach(g => {
+          g.members.forEach(m => {
+            memberAliasesMap[m.name] = [];
+          });
+        });
+        
+        for (const [alias, memberName] of Object.entries(voiceAliases)) {
+          if (!memberAliasesMap[memberName]) memberAliasesMap[memberName] = [];
+          memberAliasesMap[memberName].push(alias);
+        }
+
+        const allMemberNames = Object.keys(memberAliasesMap);
+        if (allMemberNames.length === 0) {
+          valList.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">No members found.</span>`;
+        } else {
+          allMemberNames.forEach(mName => {
+            const aliases = memberAliasesMap[mName] || [];
+            let chipsHtml = "";
+            if (aliases.length > 0) {
+              aliases.forEach(a => {
+                chipsHtml += `<span class="alias-chip">"${a}" <span class="alias-chip-del" onclick="deleteVoiceAlias('${a}')" title="Delete voice alias">✕</span></span>`;
+              });
+            } else {
+              chipsHtml = `<span style="font-size:11px;color:var(--text-muted);font-style:italic;">No custom voice aliases taught</span>`;
+            }
+            
+            valList.innerHTML += `<div class="list-item" style="flex-direction:column; align-items:flex-start; gap:6px;">
+              <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <span style="font-weight:bold; color:#fff;">${mName}</span>
+                <button class="btn btn-secondary" style="padding:3px 8px; font-size:11px;" onclick="openTrainVoiceModal('${mName}')">🎙️ + Teach</button>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; align-items:center;">${chipsHtml}</div>
+            </div>`;
+          });
+        }
+      }
     }
 
     function selectSettingsGroup(idx) { selectedGroupForMembers = idx; renderSettings(); }
@@ -703,8 +787,19 @@
     }
 
     function openEditMemberModal(gIdx, mIdx) {
-      const m = appData.groups[gIdx].members[mIdx];
-      showModal("Edit Member", `<div class="form-group"><label>Name</label><input type="text" id="mMemInp" class="form-control" value="${m.name}"></div><div class="form-group"><label>Prev Data</label><input type="number" id="mPrevInp" class="form-control" value="${m.prev}"></div>`, () => {
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+
+      const m = targetGroups[gIdx].members[mIdx];
+      const modalContent = `
+        <div class="form-group"><label>Name</label><input type="text" id="mMemInp" class="form-control" value="${m.name}"></div>
+        <div class="form-group"><label>Prev Data</label><input type="number" id="mPrevInp" class="form-control" value="${m.prev}"></div>
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <button type="button" class="btn btn-secondary" style="width: 100%; font-size: 12px;" onclick="closeModal(); openTrainVoiceModal('${m.name}');">🎙️ Teach Voice Pronunciation for ${m.name}</button>
+        </div>
+      `;
+      showModal("Edit Member", modalContent, () => {
         m.name = document.getElementById("mMemInp").value.trim() || m.name;
         m.prev = parseInt(document.getElementById("mPrevInp").value)||0;
         saveData(); renderSettings(); renderGroups(); closeModal();
@@ -793,7 +888,14 @@
       
       const wb = XLSX.utils.book_new();
       const er = [[title], ["#", "Group", "Name", "1C", "2C", "3C", "Prev Total"]];
-      targetGroups.forEach(g => { g.members.forEach((m, i) => er.push([i+1, g.name, m.name, m.c1, m.c2, m.c3, m.prev])); });
+      targetGroups.forEach(g => { 
+        g.members.forEach((m, i) => {
+          const v1 = (m.c1 === 'x') ? 0 : m.c1;
+          const v2 = (m.c2 === 'x') ? 0 : m.c2;
+          const v3 = (m.c3 === 'x') ? 0 : m.c3;
+          er.push([i+1, g.name, m.name, v1, v2, v3, m.prev]);
+        }); 
+      });
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(er), "Data Entry");
       XLSX.writeFile(wb, `${title.replace(/\s+/g,'_')}.xlsx`);
       showToast("📥 Exported Excel");
@@ -853,88 +955,136 @@
       renderApp();
     }
 
-    function exportToExcel() {
-      let title = appData.reportTitle;
-      let targetGroups = appData.groups;
-      if (viewingSlotIdx !== null) { title = appData.saveSlots[viewingSlotIdx].title; targetGroups = appData.saveSlots[viewingSlotIdx].groups; }
-      else if (viewingHistoryIdx !== null) { title = appData.reportHistory[viewingHistoryIdx].title; targetGroups = appData.reportHistory[viewingHistoryIdx].groups; }
-      
-      const wb = XLSX.utils.book_new();
-      const er = [[title], ["#", "Group", "Name", "1C", "2C", "3C", "Prev Total"]];
-      targetGroups.forEach(g => { 
-        g.members.forEach((m, i) => {
-          const v1 = (m.c1 === 'x') ? 0 : m.c1;
-          const v2 = (m.c2 === 'x') ? 0 : m.c2;
-          const v3 = (m.c3 === 'x') ? 0 : m.c3;
-          er.push([i+1, g.name, m.name, v1, v2, v3, m.prev]);
-        }); 
-      });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(er), "Data Entry");
-      XLSX.writeFile(wb, `${title.replace(/\s+/g,'_')}.xlsx`);
-      showToast("📥 Exported Excel");
-    }
 
-    function openBulkEntryModal() {
-      let namesHtml = "";
-      let valuesText = "";
-      let totalMembers = 0;
-      
-      let targetGroups = appData.groups;
-      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
-      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
-      
-      targetGroups.forEach((g) => {
-        g.members.forEach((m) => {
-          namesHtml += `<div style="font-family: 'JetBrains Mono', monospace; font-size:13px; height: 28px; line-height: 28px; white-space: nowrap; overflow-x: auto; scrollbar-width: none;">
-            <span style="color:#64748b">${g.name} -</span> <span style="color:#e2e8f0; font-weight: bold;">${m.name}</span>
-          </div>`;
-          valuesText += `${m.prev}\n`;
-          totalMembers++;
-        });
-      });
-
-      let html = `
-      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Paste any text containing your totals. It will automatically extract all numbers in order and apply them to the <b>${totalMembers}</b> members.</p>
-      <div style="background: #0f172a; padding: 10px 4px 10px 10px; border-radius: 8px; border: 1px solid #334155; max-height: 350px; overflow-y: auto;">
-        <div style="display:flex; gap:10px;">
-          <div style="flex: 2; overflow: hidden; color: #94a3b8; padding-top: 8px;">
-            ${namesHtml}
-          </div>
-          <textarea id="bulkTextarea" class="form-control" style="flex: 1; min-width: 60px; height: ${totalMembers * 28 + 16}px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 28px; resize: none; padding: 8px 8px; font-weight: bold; overflow-wrap: normal; overflow: auto; border: none; background: transparent; outline: none; box-shadow: none;">${valuesText.trim()}</textarea>
-        </div>
-      </div>
-      <style>.group-names-scroll::-webkit-scrollbar { display: none; }</style>`;
-      
-      showModal("Smart Bulk Entry", html, () => {
-        const text = document.getElementById("bulkTextarea").value.trim();
-        const numbers = text.match(/\d+/g) || [];
-        let numIdx = 0;
-        targetGroups.forEach((g) => {
-          g.members.forEach((m) => {
-            if (numIdx < numbers.length) {
-              m.prev = parseInt(numbers[numIdx]);
-              numIdx++;
-            } else {
-              m.prev = 0;
-            }
-          });
-        });
-        saveData();
-        renderApp();
-        closeModal();
-      });
-    }
-
-    // --- Voice Assistant ---
+    // --- Voice Assistant Intelligence & Memory System ---
     let recognition = null;
     let isListening = false;
+    let voiceTrainingActive = false;
+    let onVoiceTrainedCallback = null;
+    let selectedLearningMember = null;
 
     window.addEventListener('load', () => {
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!Speech) {
-        document.getElementById("voiceBtn").style.display = "none";
+        const btn = document.getElementById("voiceBtn");
+        if (btn) btn.style.display = "none";
       }
     });
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function levenshtein(a, b) {
+      if (!a || !b) return (a || b || "").length;
+      a = a.toLowerCase();
+      b = b.toLowerCase();
+      const matrix = [];
+      for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+      for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+      for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+          if (b.charAt(i - 1) === a.charAt(j - 1)) {
+            matrix[i][j] = matrix[i - 1][j - 1];
+          } else {
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j - 1] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j] + 1
+            );
+          }
+        }
+      }
+      return matrix[b.length][a.length];
+    }
+
+    function formatCellVal(val) {
+      if (val === '' || val === null || val === undefined) return '-';
+      if (val === 'x' || val === 'X') return 'X';
+      return val;
+    }
+
+    function extractVoiceTokens(str) {
+      if (!str) return [];
+      let s = str.toLowerCase();
+
+      // Normalize spoken numbers / compound phrases
+      s = s.replace(/\bone\s+hundred\b/g, " 1 0 0 ");
+      s = s.replace(/\bhundred\b/g, " 0 0 ");
+      s = s.replace(/\bdouble\s+zero\b/g, " 0 0 ");
+      s = s.replace(/\btriple\s+zero\b/g, " 0 0 0 ");
+      s = s.replace(/\bdouble\s+one\b/g, " 1 1 ");
+      s = s.replace(/\btriple\s+one\b/g, " 1 1 1 ");
+
+      const wordMap = {
+        "zero": "0", "0": "0", "o": "0", "oh": "0", "nil": "0", "nill": "0", "null": "0", "none": "0", "no": "0",
+        "one": "1", "1": "1", "won": "1",
+        "two": "2", "2": "2", "to": "2", "too": "2",
+        "three": "3", "3": "3", "tree": "3",
+        "four": "4", "4": "4", "for": "4", "fore": "4",
+        "five": "5", "5": "5",
+        "six": "6", "6": "6",
+        "seven": "7", "7": "7",
+        "eight": "8", "8": "8", "ate": "8",
+        "nine": "9", "9": "9",
+        "ten": "10",
+        "x": "x", "ex": "x", "cross": "x", "cut": "x", "blank": "x", "empty": "x", "dash": "x", "skip": "x"
+      };
+
+      const rawWords = s.split(/\s+/).filter(w => w.length > 0);
+      const tokens = [];
+
+      for (let w of rawWords) {
+        if (wordMap[w] !== undefined) {
+          const mapped = wordMap[w];
+          if (mapped === '10') {
+            tokens.push('1');
+            tokens.push('0');
+          } else {
+            tokens.push(mapped);
+          }
+        } else if (/\d+/.test(w)) {
+          const numMatches = w.match(/\d+/g);
+          if (numMatches) {
+            for (let numStr of numMatches) {
+              // Split multi-digit numbers like "100" or "10" into individual digits for separate boxes!
+              for (let char of numStr) {
+                tokens.push(char);
+              }
+            }
+          }
+        } else if (w.includes('x')) {
+          tokens.push('x');
+        }
+      }
+
+      return tokens.slice(0, 3);
+    }
+
+    function extractSpokenNamePart(text) {
+      if (!text) return "";
+      let s = text.toLowerCase();
+      
+      // Remove filler action words
+      s = s.replace(/\b(for|put|enter|add|set|update|record|member)\b/g, " ");
+      // Remove spoken number words
+      s = s.replace(/\bone\s+hundred\b/g, " ");
+      s = s.replace(/\bhundred\b/g, " ");
+      s = s.replace(/\b(zero|one|won|two|to|too|three|tree|four|fore|five|six|seven|eight|ate|nine|ten|x|ex|cross|cut|blank|empty|dash|skip|double|triple|nil|null)\b/g, " ");
+      s = s.replace(/\d+/g, " ");
+      s = s.replace(/[^a-z\s]/g, " ");
+      
+      return s.trim().replace(/\s+/g, " ");
+    }
+
+    function applyTokensToMember(member, tokens) {
+      if (!member || !tokens || tokens.length === 0) return;
+      const fields = ['c1', 'c2', 'c3'];
+      for (let i = 0; i < Math.min(tokens.length, fields.length); i++) {
+        const t = tokens[i];
+        member[fields[i]] = (t === 'x') ? 'x' : parseInt(t, 10);
+      }
+    }
 
     function initSpeechRecognition() {
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -943,21 +1093,35 @@
       recognition = new Speech();
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      
+      const lang = appData.voiceLang || 'en-IN';
+      recognition.lang = (lang === 'default') ? (navigator.language || 'en-US') : lang;
       
       recognition.onstart = function() {
         isListening = true;
-        document.getElementById("voiceBtn").classList.add("listening");
-        showToast("🎙️ Listening... Say 'Name numbers' (e.g. 'Flash 1 0 5')");
+        document.getElementById("voiceBtn")?.classList.add("listening");
+        const banner = document.getElementById("voiceStatusBanner");
+        if (banner) {
+          banner.classList.add("show");
+          document.getElementById("voiceStatusText").innerText = voiceTrainingActive ? "Say name now..." : "Listening... (e.g. 'Lucifer 1 0 0')";
+        }
       };
       
       recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript.toLowerCase();
-        processVoiceCommand(transcript);
+        const transcript = event.results[0][0].transcript;
+        if (voiceTrainingActive && onVoiceTrainedCallback) {
+          onVoiceTrainedCallback(transcript.trim().toLowerCase());
+          voiceTrainingActive = false;
+          onVoiceTrainedCallback = null;
+        } else {
+          processVoiceCommand(transcript);
+        }
       };
       
       recognition.onerror = function(event) {
-        showToast("🎙️ Error: " + event.error);
+        if (event.error !== 'no-speech') {
+          showToast("🎙️ Voice: " + event.error);
+        }
         stopListening();
       };
       
@@ -968,61 +1132,292 @@
 
     function toggleVoiceRecognition() {
       if (!recognition) initSpeechRecognition();
-      if (!recognition) return;
+      if (!recognition) {
+        showToast("Voice recognition not supported in this browser");
+        return;
+      }
       
-      if (isListening) recognition.stop();
-      else recognition.start();
+      if (isListening) {
+        recognition.stop();
+      } else {
+        voiceTrainingActive = false;
+        onVoiceTrainedCallback = null;
+        try {
+          recognition.start();
+        } catch(e) {
+          recognition.stop();
+          setTimeout(() => recognition.start(), 200);
+        }
+      }
     }
 
     function stopListening() {
       isListening = false;
-      document.getElementById("voiceBtn").classList.remove("listening");
+      document.getElementById("voiceBtn")?.classList.remove("listening");
+      document.getElementById("voiceStatusBanner")?.classList.remove("show");
     }
 
-    function processVoiceCommand(text) {
-      const wordMap = { "zero":"0", "one":"1", "two":"2", "three":"3", "four":"4", "five":"5", "six":"6", "seven":"7", "eight":"8", "nine":"9", "ten":"10", "x":"x", "ex":"x", "cross":"x", "blank":"x", "empty":"x" };
+    function processVoiceCommand(rawTranscript) {
+      if (!rawTranscript || !rawTranscript.trim()) return;
+      const text = rawTranscript.trim();
       
       let targetGroups = appData.groups;
       if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
       else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
 
-      let matchedG = -1, matchedM = -1, matchedName = "";
-      for (let g=0; g<targetGroups.length; g++) {
-        for (let m=0; m<targetGroups[g].members.length; m++) {
-          const mName = targetGroups[g].members[m].name.toLowerCase();
-          if (text.includes(mName)) {
-            matchedG = g; matchedM = m; matchedName = mName; break;
+      const allMembers = [];
+      targetGroups.forEach((g, gIdx) => {
+        g.members.forEach((m, mIdx) => {
+          allMembers.push({ gIdx, mIdx, groupName: g.name, member: m, name: m.name });
+        });
+      });
+
+      const voiceAliases = appData.voiceAliases || {};
+      const lowerText = text.toLowerCase();
+
+      let matchedMember = null;
+      let matchedStr = "";
+
+      // 1. Check exact member names (longest first)
+      const sortedMembers = [...allMembers].sort((a, b) => b.name.length - a.name.length);
+      for (const mObj of sortedMembers) {
+        const mName = mObj.name.toLowerCase();
+        const regex = new RegExp(`\\b${escapeRegExp(mName)}\\b`, 'i');
+        if (regex.test(lowerText) || lowerText.includes(mName)) {
+          matchedMember = mObj;
+          matchedStr = mName;
+          break;
+        }
+      }
+
+      // 2. Check remembered voice aliases
+      if (!matchedMember) {
+        const sortedAliases = Object.keys(voiceAliases).sort((a, b) => b.length - a.length);
+        for (const alias of sortedAliases) {
+          const regex = new RegExp(`\\b${escapeRegExp(alias)}\\b`, 'i');
+          if (regex.test(lowerText) || lowerText.includes(alias)) {
+            const targetName = (voiceAliases[alias] || "").toLowerCase();
+            const found = allMembers.find(m => m.name.toLowerCase() === targetName);
+            if (found) {
+              matchedMember = found;
+              matchedStr = alias;
+              break;
+            }
           }
         }
-        if (matchedM !== -1) break;
       }
-      
-      if (matchedM === -1) { showToast("❌ Could not recognize name."); return; }
-      
-      const afterStr = text.substring(text.indexOf(matchedName) + matchedName.length).trim();
-      const rawTokens = afterStr.split(/\s+/);
-      const finalTokens = [];
-      
-      rawTokens.forEach(t => {
-        if (/\d+/.test(t)) {
-          const nums = t.match(/\d+/g);
-          if (nums) nums.forEach(n => finalTokens.push(n));
-        } else if (wordMap[t] !== undefined) {
-          finalTokens.push(wordMap[t]);
+
+      // 3. If matched, extract numbers and apply
+      if (matchedMember) {
+        const remaining = lowerText.replace(matchedStr, " ").trim();
+        const tokens = extractVoiceTokens(remaining);
+        
+        if (tokens.length > 0) {
+          applyTokensToMember(matchedMember.member, tokens);
+          saveData();
+          renderApp();
+          const c1Str = formatCellVal(matchedMember.member.c1);
+          const c2Str = formatCellVal(matchedMember.member.c2);
+          const c3Str = formatCellVal(matchedMember.member.c3);
+          showToast(`✅ ${matchedMember.name}: 1C: ${c1Str} | 2C: ${c2Str} | 3C: ${c3Str}`);
+        } else {
+          showToast(`🎙️ Heard ${matchedMember.name}, but no numbers (say e.g. '${matchedMember.name} 1 0 0')`);
+        }
+        return;
+      }
+
+      // 4. If UNRECOGNIZED: Separate spoken name candidate from numbers and show learning modal
+      const tokens = extractVoiceTokens(lowerText);
+      const spokenName = extractSpokenNamePart(lowerText) || text;
+
+      let bestGuess = null;
+      let minDistance = 999;
+      allMembers.forEach(mObj => {
+        const dist = levenshtein(spokenName, mObj.name.toLowerCase());
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestGuess = mObj;
         }
       });
+
+      // Also check distance to known aliases
+      for (const [alias, mName] of Object.entries(voiceAliases)) {
+        const dist = levenshtein(spokenName, alias);
+        if (dist < minDistance) {
+          minDistance = dist;
+          const found = allMembers.find(m => m.name.toLowerCase() === mName.toLowerCase());
+          if (found) bestGuess = found;
+        }
+      }
+
+      showVoiceLearningModal({
+        rawTranscript: text,
+        spokenName: spokenName,
+        tokens: tokens,
+        allMembers: allMembers,
+        suggestedMember: (minDistance <= 3) ? bestGuess : null
+      });
+    }
+
+    function showVoiceLearningModal({ rawTranscript, spokenName, tokens, allMembers, suggestedMember }) {
+      selectedLearningMember = suggestedMember ? suggestedMember.name : (allMembers[0] ? allMembers[0].name : "");
       
-      if (finalTokens.length > 0) {
-        const member = targetGroups[matchedG].members[matchedM];
-        if (finalTokens.length > 0) member.c1 = finalTokens[0] === 'x' ? 'x' : parseInt(finalTokens[0]);
-        if (finalTokens.length > 1) member.c2 = finalTokens[1] === 'x' ? 'x' : parseInt(finalTokens[1]);
-        if (finalTokens.length > 2) member.c3 = finalTokens[2] === 'x' ? 'x' : parseInt(finalTokens[2]);
+      const tokensDisplay = tokens.length > 0 ? tokens.map(t => (t === 'x' ? 'X' : t)).join(' ') : 'None detected';
+      
+      let membersHtml = "";
+      allMembers.forEach(mObj => {
+        const isSelected = mObj.name === selectedLearningMember;
+        const isSuggested = suggestedMember && mObj.name === suggestedMember.name;
+        membersHtml += `<button type="button" class="voice-member-btn ${isSelected ? 'selected' : ''}" id="vmb_${mObj.name.replace(/\s+/g,'_')}" onclick="selectLearningMember('${mObj.name}')">
+          <span>${mObj.name} <small style="color:#94a3b8">(${mObj.groupName})</small></span>
+          ${isSuggested ? '<span class="suggested-tag">✨ Suggested</span>' : ''}
+        </button>`;
+      });
+
+      const modalHtml = `
+        <div class="voice-learning-box">
+          <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; margin-bottom: 4px;">Voice Heard</div>
+          <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">"${spokenName}"</div>
+          <div style="font-size: 12px; color: #cbd5e1;">Numbers detected: <b style="color:#4ade80; font-family:'JetBrains Mono',monospace;">${tokensDisplay}</b></div>
+        </div>
+        
+        <p style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 8px;">Which member did you mean?</p>
+        <div class="voice-members-grid">
+          ${membersHtml}
+        </div>
+        
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cbd5e1; cursor: pointer; margin-top: 6px;">
+          <input type="checkbox" id="rememberVoiceAliasCheck" checked style="accent-color: #3b82f6; width: 16px; height: 16px;">
+          Remember "<b>${spokenName}</b>" as this member's pronunciation
+        </label>
+      `;
+
+      showModal("🎙️ Voice Name Learning", modalHtml, () => {
+        if (!selectedLearningMember) {
+          showToast("Please select a member");
+          return;
+        }
+
+        const shouldRemember = document.getElementById("rememberVoiceAliasCheck")?.checked;
+        if (shouldRemember && spokenName) {
+          appData.voiceAliases = appData.voiceAliases || {};
+          appData.voiceAliases[spokenName.toLowerCase()] = selectedLearningMember;
+        }
+
+        const targetObj = allMembers.find(m => m.name === selectedLearningMember);
+        if (targetObj && tokens.length > 0) {
+          applyTokensToMember(targetObj.member, tokens);
+        }
+
         saveData();
         renderApp();
-        showToast(`✅ Updated ${member.name}: ${finalTokens.slice(0,3).join(' ')}`);
-      } else {
-        showToast(`Heard ${matchedName} but no valid numbers.`);
+        closeModal();
+        
+        if (shouldRemember) {
+          showToast(`🎉 Remembered! Next time you say "${spokenName}", it will update ${selectedLearningMember}!`);
+        } else {
+          showToast(`✅ Updated ${selectedLearningMember}!`);
+        }
+      });
+    }
+
+    function selectLearningMember(name) {
+      selectedLearningMember = name;
+      document.querySelectorAll('.voice-member-btn').forEach(btn => btn.classList.remove('selected'));
+      const el = document.getElementById(`vmb_${name.replace(/\s+/g,'_')}`);
+      if (el) el.classList.add('selected');
+    }
+
+    function openTrainVoiceModal(preselectMemberName) {
+      let targetGroups = appData.groups;
+      if (viewingSlotIdx !== null) targetGroups = appData.saveSlots[viewingSlotIdx].groups;
+      else if (viewingHistoryIdx !== null) targetGroups = appData.reportHistory[viewingHistoryIdx].groups;
+
+      const allMembers = [];
+      targetGroups.forEach(g => g.members.forEach(m => allMembers.push(m.name)));
+      if (allMembers.length === 0) {
+        showToast("Please add members first!");
+        return;
       }
+
+      const selectedName = preselectMemberName || allMembers[0];
+      let optionsHtml = allMembers.map(n => `<option value="${n}" ${n === selectedName ? 'selected' : ''}>${n}</option>`).join('');
+
+      const modalHtml = `
+        <div class="form-group">
+          <label>Select Member</label>
+          <select id="trainMemberSelect" class="form-control">
+            ${optionsHtml}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>How You Pronounce It / How Speech Recognition Hears It</label>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="trainAliasInput" class="form-control" placeholder="e.g. aryan, biking, lucy">
+            <button type="button" class="btn btn-primary" onclick="recordTrainingVoice()" style="white-space:nowrap;" id="btnRecordVoice">🎙️ Speak</button>
+          </div>
+          <small style="color:var(--text-muted); font-size:11px; margin-top:4px; display:block;">Click 'Speak' and say the name into your mic, or type the alias manually.</small>
+        </div>
+        <div id="trainVoiceStatus" style="font-size:12px; color:#38bdf8; font-weight:bold; min-height:18px;"></div>
+      `;
+
+      showModal("🎙️ Teach Voice Pronunciation", modalHtml, () => {
+        const mem = document.getElementById("trainMemberSelect").value;
+        const alias = document.getElementById("trainAliasInput").value.trim().toLowerCase();
+        if (!alias) {
+          showToast("Please enter or record a voice pronunciation");
+          return;
+        }
+        appData.voiceAliases = appData.voiceAliases || {};
+        appData.voiceAliases[alias] = mem;
+        saveData();
+        renderSettings();
+        closeModal();
+        showToast(`🎉 Learned! "${alias}" will now recognize as ${mem}`);
+      });
+    }
+
+    function recordTrainingVoice() {
+      const statusEl = document.getElementById("trainVoiceStatus");
+      if (statusEl) statusEl.innerText = "🎙️ Listening... Say the member's name now!";
+      
+      voiceTrainingActive = true;
+      onVoiceTrainedCallback = function(heardText) {
+        const cleanName = extractSpokenNamePart(heardText) || heardText;
+        const inp = document.getElementById("trainAliasInput");
+        if (inp) inp.value = cleanName;
+        if (statusEl) statusEl.innerText = `✅ Heard: "${cleanName}"! Click Save.`;
+      };
+      
+      if (!recognition) initSpeechRecognition();
+      if (recognition) {
+        try {
+          recognition.start();
+        } catch(e) {
+          recognition.stop();
+          setTimeout(() => recognition.start(), 200);
+        }
+      }
+    }
+
+    function deleteVoiceAlias(alias) {
+      if (appData.voiceAliases && appData.voiceAliases[alias]) {
+        delete appData.voiceAliases[alias];
+        saveData();
+        renderSettings();
+        showToast(`🗑️ Removed pronunciation "${alias}"`);
+      }
+    }
+
+    function changeVoiceLanguage(lang) {
+      appData.voiceLang = lang;
+      saveData();
+      if (recognition) {
+        const l = (lang === 'default') ? (navigator.language || 'en-US') : lang;
+        recognition.lang = l;
+      }
+      showToast(`🌐 Voice accent set to: ${lang}`);
     }
 
     renderApp();
