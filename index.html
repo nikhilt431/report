@@ -212,7 +212,10 @@
       <div class="summary-card">
         <div class="summary-header">
           <h3 id="settingsMembersTitle">Select a group to manage members</h3>
-          <button class="btn btn-success" id="btnAddMember" style="display:none;" onclick="openAddMemberModal()">+ Add Member</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" id="btnBulkAddMember" style="display:none; padding: 6px 12px; font-size: 12px;" onclick="openBulkAddMembersModal()">+ Bulk Add</button>
+            <button class="btn btn-success" id="btnAddMember" style="display:none; padding: 6px 12px; font-size: 12px;" onclick="openAddMemberModal()">+ Add Member</button>
+          </div>
         </div>
         <div id="settingsMembersList"></div>
       </div>
@@ -310,6 +313,11 @@
         if (!appData.voiceAliases) appData.voiceAliases = {};
         if (!appData.voiceLang) appData.voiceLang = 'en-IN';
         if (!appData.reportHistory) appData.reportHistory = [];
+        if (appData.groups) {
+          appData.groups.forEach(g => { if (!g.members) g.members = []; });
+        } else {
+          appData.groups = [];
+        }
         
         localStorage.setItem("report_app_data_v2", JSON.stringify(appData));
         if (typeof renderApp === 'function') renderApp();
@@ -323,6 +331,12 @@
       if (!data.saveSlots) data.saveSlots = [null, null, null, null, null, null];
       if (!data.voiceAliases) data.voiceAliases = {};
       if (!data.voiceLang) data.voiceLang = 'en-IN';
+      if (!data.reportHistory) data.reportHistory = [];
+      if (data.groups) {
+        data.groups.forEach(g => { if (!g.members) g.members = []; });
+      } else {
+        data.groups = [];
+      }
       return data;
     }
 
@@ -620,7 +634,7 @@
       document.getElementById("tabBtnEntry").className = "tab-btn" + (tab === 'entry' ? " active" : "");
       document.getElementById("tabBtnSummary").className = "tab-btn" + (tab === 'summary' ? " active" : "");
       document.getElementById("tabBtnSettings").className = "tab-btn" + (tab === 'settings' ? " active" : "");
-      if (tab !== 'entry') closeKeypad();
+
     }
 
     function updateSummary() {
@@ -715,6 +729,7 @@
         const g = appData.groups[selectedGroupForMembers];
         document.getElementById("settingsMembersTitle").innerText = `Members of ${g.name}`;
         document.getElementById("btnAddMember").style.display = "inline-flex";
+        document.getElementById("btnBulkAddMember").style.display = "inline-flex";
         ml.innerHTML = "";
         g.members.forEach((m, idx) => {
           ml.innerHTML += `<div class="list-item">
@@ -728,6 +743,7 @@
       } else {
         document.getElementById("settingsMembersTitle").innerText = "Select a group to manage members";
         document.getElementById("btnAddMember").style.display = "none";
+        document.getElementById("btnBulkAddMember").style.display = "none";
         ml.innerHTML = "";
       }
       
@@ -823,6 +839,32 @@
         const n = document.getElementById("mMemInp").value.trim();
         const p = parseInt(document.getElementById("mPrevInp").value)||0;
         if(n) { appData.groups[selectedGroupForMembers].members.push({ name:n, c1:"x", c2:"x", c3:"x", prev:p }); saveData(); renderSettings(); closeModal(); }
+      });
+    }
+
+    function openBulkAddMembersModal() {
+      if (selectedGroupForMembers === null) return;
+      const g = appData.groups[selectedGroupForMembers];
+      const html = `
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Paste a list of members. You can optionally include their previous total after a comma (e.g. <b>Lucifer, 10</b>).</p>
+      <textarea id="bulkMembersTextarea" class="form-control" style="height: 200px; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: none;" placeholder="John Doe, 5\nJane Smith\nAlpha, 12"></textarea>
+      `;
+      showModal("Bulk Add Members", html, () => {
+        const text = document.getElementById("bulkMembersTextarea").value.trim();
+        if (text) {
+          const lines = text.split('\n');
+          lines.forEach(line => {
+            const parts = line.split(',');
+            const name = parts[0].trim();
+            if (name) {
+              const prev = parts.length > 1 ? parseInt(parts[1].trim()) : 0;
+              g.members.push({ name: name, c1: "x", c2: "x", c3: "x", prev: isNaN(prev) ? 0 : prev });
+            }
+          });
+          saveData();
+          renderSettings();
+        }
+        closeModal();
       });
     }
 
